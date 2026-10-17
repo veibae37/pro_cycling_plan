@@ -14,9 +14,9 @@ An open-source AI Agent Skill, Polarized Training Planner & [Intervals.icu](http
 5. **Rider Age Range** (`<30`, `30-44`, `45-54`, `55+` recovery & microcycle adjustments)
 6. **Indoor vs. Outdoor Environment** (`Indoor smart trainer -> 25%-40% shorter duration + 3%-5% thermal power adjustment`)
 
-## 1. Multi-Dimensional Classification Matrix / 多维分档与修正矩阵
+## 1.  Classification  / 骑手分类
 
-### A. Base W/kg Tier (`CP60` or `CP20 * 0.95`) / 功体比三级基准分档
+### A. Base W/kg Tier (`CP60` or `CP20 * 0.95`) / 功体比三级分档
 
 | Tier / 档位 | Male FTP W/kg | Female FTP W/kg | Male CP20 W/kg | Base Scaling Rule / 基准缩放规则 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -29,7 +29,7 @@ An open-source AI Agent Skill, Polarized Training Planner & [Intervals.icu](http
   * **Balanced All-Rounder (`1.85 <= CP1 / FTP <= 2.2`)**: Uses standard `FTP = CP20 * 0.95`.
   * **Diesel / Time-Trialist (`CP1 / FTP < 1.85`)**: Uses `FTP = CP20 * 0.96`; caps 10s–30s fast-starts and spikes at `125%–135% FTP` to prevent premature failure.
 
-### B. Four Real-World Modifiers / 四大实战修正维度
+### B.  Real-World Modifiers /实际修正
 
 | Dimension / 维度 | Category / 分档 | Scaling Adjustment / 课表动态修正规则 |
 | :--- | :--- | :--- |
@@ -38,7 +38,7 @@ An open-source AI Agent Skill, Polarized Training Planner & [Intervals.icu](http
 | **3. Age Range (年龄范围)** | **`< 30` (U30)**<br>**`30 - 44` (Masters A)**<br>**`45 - 54` (Masters B)**<br>**`55+` (Senior Masters)** | **`< 30`**: Standard recovery & 2–3 hard days/wk.<br>**`30 - 44`**: Inter-rep recovery **+15–30s**, min 48h between hard sessions.<br>**`45 - 54`**: Interval volume **-10% to -15%**, recovery **+30–60s**, warmup >=15m, max 2 hard days/wk (or 9-day microcycle).<br>**`55+`**: Interval volume **-20% to -30%**, peak VO2/spike target **-3% to -5% FTP**, recovery **+60–90s**. |
 | **4. Indoor vs. Outdoor (室内与室外区别)** | **Outdoor (室外公路)**<br>**Indoor (室内骑行台)** | **Outdoor**: 100% duration (2–4.5h) and 100% target `%FTP`.<br>**Indoor Trainer**: Zero coasting + high thermal load -> **Shorten total duration by `25%–40%`** (cap at **45–90m**, warmup 10–15m, cooldown 5–10m) and lower LT2/VO2Max wattage by **`3%–5% FTP`**. |
 
-## 2. How to Use Across All AI Platforms / 各大 AI 平台接入指南
+## 2. How to Use  / 接入指南
 
 Keep the complete repository in the skill folder so the agent can also access `src/` and `mcp/`. Installing the skill adds instructions; installing the MCP SDK and connecting your account are separate steps. Commands below use Windows PowerShell. If the target already exists, update that checkout instead of cloning over it.
 
@@ -148,7 +148,7 @@ INTERVALS_API_KEY = "REPLACE_WITH_YOUR_API_KEY"
 
 Restart the client and inspect `/mcp`, or run `codex mcp list`. Local Codex clients on the same host share this configuration. See [official OpenAI MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 
-### Step 4: Available MCP Tools (实际提供的四个工具)
+### Step 4: Available MCP Tools
 
 - `get_athlete_profile()`: returns `id`, `name`, `weight_kg`, and `sportSettings`. FTP-related values depend on the fields returned inside sport settings; eFTP and W' are not explicitly extracted by this wrapper.
 - `get_recent_wellness_and_activities(oldest_date, newest_date)`: returns activities and wellness for the supplied `YYYY-MM-DD` range. Available load metrics and activities depend on API responses and data-source restrictions. This does not itself diagnose fatigue or glycogen depletion.
@@ -174,7 +174,7 @@ Both write tools create events with `POST /events`. They do not check duplicates
 - HTTP 401/403: check credentials and account permissions. Missing source activities may also reflect API data-source restrictions.
 - No account integration was tested just by installing the skill or running the calculator. Verify a read request before attempting a calendar write.
 
-## 4. 中文快速使用指南 (Chinese Quick Start)
+## 4. 中文指南 (Chinese Quick Start)
 
 ### 提问模板示例
 

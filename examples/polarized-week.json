@@ -1,0 +1,38 @@
+{
+  "description": "Hypothetical trained rider, FTP250W; user-supplied example boundaries, not universal LT1/LT2. Monday rest. Not a real athlete record.",
+  "ftp": 250,
+  "weekly_tss_range": [500, 600],
+  "zone_boundaries_pct_ftp": [70, 100],
+  "sessions": [
+    {
+      "day": "Tuesday",
+      "label": "90min quality: controlled warmup + 6x4min VO2; repeat recovery only five times",
+      "workout": "Warmup\n- 8m 55%\n\nPrimer\n- 12m 85%\n\nVO2 5x\n- 4m 110%\n- 4m 50%\n\nLast VO2\n- 4m 110%\n\nEasy finish\n- 26m 55%"
+    },
+    {
+      "day": "Wednesday",
+      "label": "120min low-intensity endurance; choose gentle climbs while holding the ceiling",
+      "workout": "Endurance on controllable terrain\n- 120m 65%"
+    },
+    {
+      "day": "Thursday",
+      "label": "90min Z2 climbing; identical to z2-climbing.txt",
+      "workout": "Warmup\n- 15m 55%\n\nClimb 1\n- 20m 65%\n\nRecovery\n- 5m 50%\n\nClimb 2\n- 20m 65%\n\nEndurance\n- 20m 60%\n\nCooldown\n- 10m 50%"
+    },
+    {
+      "day": "Friday",
+      "label": "90min quality: 6x4min VO2; only for a rider adapted to this workload",
+      "workout": "Warmup\n- 8m 55%\n\nPrimer\n- 12m 85%\n\nVO2 5x\n- 4m 115%\n- 4m 50%\n\nLast VO2\n- 4m 115%\n\nEasy finish\n- 26m 55%"
+    },
+    {
+      "day": "Saturday",
+      "label": "210min easy endurance; shorten if Friday fatigue persists",
+      "workout": "Easy endurance\n- 210m 60%"
+    },
+    {
+      "day": "Sunday",
+      "label": "120min easy endurance, optional reduction if fatigued",
+      "workout": "Easy endurance\n- 120m 55%"
+    }
+  ]
+}

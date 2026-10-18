@@ -10,10 +10,10 @@ Adaptive cycling plans built around your goals, available time and recovery, wit
 
 From FTP and climbing to repeated surges and long-ride durability: define the goal and constraints, build the training cycle, select workouts, then adjust from post-ride feedback.
 
-[Showcase](#showcase) · [Rider classification](#classification) · [Install the skill](#installation) · [Connect Intervals.icu](#intervals-mcp) · [Usage & maintenance](#usage)
+[Showcase](#showcase) · [Rider classification](#classification) · [Install the skill](#installation) · [Connect Intervals.icu](#intervals-mcp) · [Further reading](#usage)
 
 > [!NOTE]
-> This repository has three independent parts: `SKILL.md` planning instructions, a Python calculator, and an Intervals.icu MCP server. Installing the skill does not connect an account. The agent creates multi-week plans from the instructions; see [implementation limits](#limits) for the fixed calculator's capabilities.
+> After installing the skill, ask the agent to plan around your goals. Calendar writes require a separately connected and authorized Intervals.icu MCP server.
 
 <a id="showcase"></a>
 
@@ -256,64 +256,22 @@ In Claude Desktop, open Settings → Developer → Edit Config. Claude Code uses
 
 </details>
 
-### Base MCP tools
+### Workflow
 
-- **`get_athlete_profile()`**: read account details, weight and sport settings. Available FTP fields depend on the returned data.
-- **`get_recent_wellness_and_activities(oldest_date, newest_date)`**: read activities and wellness within a date range. Interpret only returned metrics; they do not independently diagnose fatigue causes.
-- **`create_intervals_workout(target_date, name, description_code, moving_time_sec)`**: write the prepared workout text to a calendar date. Pass the final duration in seconds; the default is 4,500 seconds.
-- **`generate_and_push_pro_workout(...)`**: generate a fixed-model workout and immediately write it. Set `is_cp20=false` for FTP/CP60 input. This is not a preview tool and does not automatically adapt to recent wellness.
+**Read account and training history → Preview → Authorize writes → Check parsed steps and device sync.**
 
-### Recommended workflow
-
-**Read account and training history → Preview → Obtain write authorization → Check parsed steps and device sync.**
-
-The base write tools use `POST /events` and do not implement calendar queries, updates, deletion or safe duplicate prevention. Check the calendar before retrying an ambiguous network result. A local MCP extension handled read-back and batch verification for the showcase; those operations are not part of these four base tools.
-
-<details>
-<summary><strong>Connection troubleshooting</strong></summary>
-
-- **Missing `mcp.server` or `FastMCP`**: install `mcp<2` using the interpreter named in your configuration. The repository's `mcp/` folder is not the SDK.
-- **Server will not start**: check interpreter/script paths, JSON/TOML syntax and client logs.
-- **`Missing INTERVALS_API_KEY`**: confirm the key is passed through the server's `env`, then restart the connection.
-- **HTTP 401/403**: check credentials and permissions, and whether network protection generated the response. A 403 does not necessarily mean the key is wrong.
-- **Incomplete activity history**: API data-source restrictions or unsynced activities can leave gaps.
-- **Calendar workout exists but the device has not received it**: inspect the platform's parsed steps, then verify the Garmin/Wahoo/Zwift integration separately.
-
-</details>
+After a successful calendar write, check dates, steps, power targets and durations. Verify Garmin/Wahoo/Zwift device sync separately.
 
 <a id="usage"></a>
 
-## 4. Usage & Maintenance
+## 4. Further Reading
 
-### Two calculation tools
-
-- **`src/tier_calculator.py`**: select a fixed model using power-to-weight ratio and training conditions. See `--help`; use `--cp60` for FTP/CP60 and `--cp20` for CP20. `--weekly` produces a fixed weekly summary without writing to the calendar.
-- **`scripts/plan_metrics.py`**: expand constant/range power steps and simple `Nx` loops into one-second targets to estimate duration, mechanical work, NP/TSS and optional three-zone PI. Use it to recalculate the showcase workout above.
-
-Calculate `hours × (NP / FTP)² × 100` per session and sum the results for weekly TSS; average power is not a substitute for NP. Mechanical kJ is integrated from power and duration; kcal estimates require a stated efficiency assumption. When physiological thresholds are unknown, PI describes only an explicitly labeled proxy scenario.
-
-### File guide
-
-- [SKILL.md](SKILL.md): planning instructions, intake, output and feedback workflow.
-- [Periodization](references/goal-periodization.md): goals, phases and reassessment.
-- [Load and distribution](references/load-and-distribution.md): TSS, energy and PI calculation methods.
-- [Image-derived workouts](references/image-workouts.md): source structure, terrain, scaling and ambiguities.
-- [Feedback loop](references/feedback-loop.md): post-ride changes and session continuity.
-- [Python calculator](src/tier_calculator.py), [metrics estimator](scripts/plan_metrics.py) and [base MCP server](mcp/intervals_mcp_server.py): implementation entry points.
-
-Actual post-ride feedback can be stored in `.training-state/state.json` inside the training directory, which Git ignores. Without persistent storage, provide a copyable summary rather than claiming automatic memory across new chats. Updating a local plan does not update the calendar.
-
-<a id="limits"></a>
-
-### Implementation limits
-
-- **Instructions and algorithms are separate:** editing `SKILL.md` does not change Python behavior. The agent plans target dates, race cycles, heat adaptation and custom sessions; the fixed CLI/MCP has no corresponding goal parameters.
-- **Recheck fixed estimates:** the original calculator uses a fixed per-model IF for TSS/kJ, and some reported durations differ from expanded steps. Recalculate final workouts and inspect them in the platform.
-- **Weekly summaries are not automatically adaptive:** fixed weekly schedules do not enforce every recovery, time, TSS or feedback constraint.
-- **Some profile inputs are not exposed:** `RiderProfile` supports `sex`, but the current CLI/MCP generation interface uses its default value.
-- **Metrics have limits:** the estimator is not an activity-file reader. Coasting, heat, actual sprints and individual thresholds affect real outcomes; TSS or PI alone cannot establish training quality.
-- **Account setup is separate:** the base server provides local stdio only, without remote deployment, multi-user OAuth or device-sync verification. Skill installation alone does not demonstrate successful account access.
+- [Planning instructions](SKILL.md): goals, workout selection, output and feedback workflow.
+- [Periodization](references/goal-periodization.md) and [feedback loop](references/feedback-loop.md): phases, reassessment and post-ride changes.
+- [Image-derived workouts](references/image-workouts.md): source structure, terrain and scaling notes.
 
 ---
 
 [简体中文](README.md) · **English**
+
+For the planning workflow, calculation methods, MCP tools and implementation limits, read [Implementation Details](docs/IMPLEMENTATION.md).

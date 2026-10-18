@@ -8,10 +8,10 @@
 
 从 FTP、爬坡到反复拉扯与长距离耐受：先确定目标与约束，再安排周期、选择课表，并根据骑后反馈调整。
 
-[查看演示](#showcase) · [骑手分类](#classification) · [安装技能](#installation) · [连接 Intervals.icu](#intervals-mcp) · [计算与维护](#usage)
+[查看演示](#showcase) · [骑手分类](#classification) · [安装技能](#installation) · [连接 Intervals.icu](#intervals-mcp) · [更多资料](#usage)
 
 > [!NOTE]
-> 本仓库包含三个独立部分：`SKILL.md` 排课规则、Python 计算器、Intervals.icu MCP。安装 Skill 不会自动连接账号；多周规划由 Agent 按规则编排，固定计算器的能力见[实现边界](#limits)。
+> 安装Skill后可由Agent按目标编排训练；写入日历还需单独连接并授权Intervals.icu MCP。
 
 <a id="showcase"></a>
 
@@ -254,64 +254,22 @@ Claude Desktop可从Settings → Developer → Edit Config打开配置；Claude 
 
 </details>
 
-### 基础 MCP 工具
+### 使用流程
 
-- **`get_athlete_profile()`**：读取账号、体重与运动设置。FTP相关字段取决于实际返回数据。
-- **`get_recent_wellness_and_activities(oldest_date, newest_date)`**：读取日期范围内的活动与wellness；只解释实际返回指标，不据此单独诊断疲劳原因。
-- **`create_intervals_workout(target_date, name, description_code, moving_time_sec)`**：把已编排的训练文本写入指定日期。必须传最终秒数，默认值为4500秒。
-- **`generate_and_push_pro_workout(...)`**：用固定模型生成并立即写入。输入FTP/CP60时设`is_cp20=false`；它不是预览工具，也不会自动结合近期wellness调整课表。
+**读取账号与训练史 → 预览课表 → 授权写入 → 核对解析与设备同步。**
 
-### 推荐流程
-
-**读取账号与训练史 → 预览课表 → 用户授权写入 → 核对解析与设备同步。**
-
-基础服务的写入工具使用`POST /events`，未实现日历查询、更新、删除或安全去重。网络结果不明时先查日历，不盲目重试。上方演示的回读与批量核对由本地MCP扩展完成，不属于这四个基础工具。
-
-<details>
-<summary><strong>常见连接问题</strong></summary>
-
-- **缺少`mcp.server`或`FastMCP`**：使用配置中同一个Python解释器安装`mcp<2`。找到仓库的`mcp/`目录不代表SDK已安装。
-- **进程无法启动**：检查解释器、脚本绝对路径、JSON/TOML语法与客户端日志。
-- **`Missing INTERVALS_API_KEY`**：确认密钥通过服务的`env`传入，再重启连接。
-- **HTTP 401/403**：核对凭据与权限，并检查响应是否来自网络防护；403不一定代表密钥错误。
-- **缺少部分历史活动**：API数据源限制或未同步活动可能使历史不完整。
-- **日历已有训练但设备没有收到**：检查平台解析出的步骤，再验证Garmin/Wahoo/Zwift等设备集成。
-
-</details>
+日历写入成功后，检查日期、步骤、功率和时长；Garmin/Wahoo/Zwift等设备端同步需另外确认。
 
 <a id="usage"></a>
 
-## 4. Usage & Maintenance / 计算与维护
+## 4. Further Reading / 更多资料
 
-### 两种计算工具
-
-- **`src/tier_calculator.py`**：按功体比与训练条件选择固定模型。参数见`--help`；使用FTP/CP60时传`--cp60`，CP20传`--cp20`。`--weekly`输出固定周摘要，不会写日历。
-- **`scripts/plan_metrics.py`**：对常数/范围功率段和简单`Nx`循环逐秒估算时长、机械做功、NP/TSS及可选三强度区PI。上方唯一演示的代表课可用其复算。
-
-TSS按每课`hours × (NP / FTP)² × 100`计算后相加，不用平均功率代替NP。kJ由功率与时长积分；kcal应声明机械效率假设。生理阈值未知时，PI仅能作为明确代理情景的估计。
-
-### 文件导航
-
-- [SKILL.md](SKILL.md)：排课规则、目标采集、输出与反馈流程。
-- [周期化规划](references/goal-periodization.md)：目标、阶段与复测安排。
-- [负荷与分布](references/load-and-distribution.md)：TSS、能量与PI计算口径。
-- [图片课表库](references/image-workouts.md)：来源结构、地形、缩放与歧义。
-- [反馈循环](references/feedback-loop.md)：训练后调整与续接规则。
-- [Python计算器](src/tier_calculator.py)、[指标估算器](scripts/plan_metrics.py)、[基础MCP服务](mcp/intervals_mcp_server.py)：各自的实现入口。
-
-真实骑后反馈可保存在训练目录的`.training-state/state.json`，该目录已被Git忽略。没有持久存储时提供可复制摘要，不声称跨新聊天自动记住；本地改计划不等于日历已经更新。
-
-<a id="limits"></a>
-
-### 实现边界
-
-- **规则不等于算法**：修改`SKILL.md`不会改变Python代码；目标日期、比赛周期、热适应和自定义专项由Agent编排，固定CLI/MCP没有这些目标参数。
-- **固定估算需复核**：原计算器使用每模型固定IF估算TSS/kJ，部分报告时长与展开步骤不同；最终课表应逐段核算并在平台检查。
-- **周摘要不自动自适应**：固定周表不会自动执行所有恢复、周时间、TSS或反馈约束。
-- **部分画像参数未暴露**：`RiderProfile`支持`sex`，当前CLI/MCP生成接口仍使用默认值。
-- **指标有适用范围**：指标估算器不是活动文件读取器；滑行、热环境、真实冲刺和个体阈值会改变实绩，不能只靠TSS或PI判定训练质量。
-- **账号连接独立配置**：基础MCP仅提供本地stdio，没有远程部署、多用户OAuth或设备同步验证；安装技能本身不能证明账号读写成功。
+- [训练规划规则](SKILL.md)：目标采集、排课、输出和反馈流程。
+- [周期化规划](references/goal-periodization.md)与[反馈循环](references/feedback-loop.md)：阶段安排、复测及骑后调整。
+- [图片课表库](references/image-workouts.md)：来源训练结构、地形与缩放说明。
 
 ---
 
 **简体中文** · [English](README.en.md)
+
+了解排课流程、计算公式、MCP工具和实现边界：[Implementation Details（英文）](docs/IMPLEMENTATION.md)。

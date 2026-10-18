@@ -32,19 +32,8 @@
 
 ## 延续记录 / 不假装拥有永久记忆
 
-有文件读写能力的Agent在用户指定训练目录维护 `.training-state/state.json`，保存目标/时区、周TSS范围、分布偏好、阈值来源、版本日期、已完成反馈与下一检查点。该目录加入Git忽略，使用真实反馈更新，不生成虚构运动员记录。已有文件先读后合并，不覆盖未知字段；修改未来计划保留原版本摘要，不改写过去的实际训练。
+有文件读写能力时，使用 `save_athlete_profile`、`save_training_plan`、`record_training_feedback` 或 `scripts/training_plan.py` 维护 Git 忽略的 `.training-state/`。档案保存 FTP 来源/日期、阈值、时间约束、语言和单位偏好；计划保存版本、原因与差异；真实反馈追加保存并关联当时的计划版本。后来的处方变化不会改写历史实际数据或原比较结果。已有 `state.json` 保留，按真实字段逐步迁移。
 
-建议字段：
+新会话先读最新档案、计划和反馈，确认目标/FTP/可用时间是否变化后再调整。没有持久存储能力时提供可复制续接摘要，不声称跨聊天自动记得。
 
-```text
-profile: goals, dates, timezone, FTP/threshold sources, availability
-preferences: weekly_tss_target/range/cap, distribution, desired_pi
-plan: version, weekly targets, remaining sessions
-completed: date, planned/actual minutes/TSS, RPE, fuel, symptoms, user wording
-adjustments: date, evidence, uncertainty, changed sessions, old/new weekly estimate
-next_check: when, questions, return-to-plan conditions
-```
-
-没有持久文件或记忆能力的网页Agent，在会话末输出可复制的“续接摘要”，让用户保存并在下次带回；说明跨新聊天不自动记得。新会话先读取记录或摘要，确认目标/FTP/可用时间有没有变化，再接着调整。
-
-日历中的未来事件不会因为本地计划修订而自动变更。现有MCP只有读取账号/活动与创建事件，没有事件查重、更新或删除；不要用重复创建冒充修改已有课表。先展示改动，按用户授权用平台现有编辑能力处理或让用户手动更新。
+日历修改用稳定的 `plan_id` / `session_id`，先 `preview_training_plan`，按已有用户授权 `sync_training_plan` 并回读验证。移除课表不会自动删除平台事件；遗留事件会被列出。超时或部分成功先回读，不重复创建替代修改。格式、状态和命令以 [Implementation Details](../docs/IMPLEMENTATION.md) 为准。

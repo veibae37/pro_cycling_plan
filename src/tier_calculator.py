@@ -8,7 +8,7 @@ Supports all 6 WorldTour Pro Workout Models + Polarized Recovery + 7-Day Microcy
   4. z3_z4_spikes    - Z3/Z4 & Anaerobic Spikes (1m50s Z3 + 10s >150% Spike + Over-Unders)
   5. vo2_over_under  - Fatigued VO2Max 2m/1m Alternating (Z2 Preload + 2m 110% / 1m 75%)
   6. short_30_30     - 30/30s High-Float & 5m 120% VO2Max Booster
-  7. recovery        - Post-Bonk / Leg-Day Polarized Z2 + Alactic Neuromuscular Primers
+  7. recovery        - Easy endurance without forced high-intensity primers
 
 6 Rider Classification & Scaling Dimensions:
   1. Weight (kg) + CP60 or CP20 -> Base W/kg Tier (Full Pro / Scaled / Double-Scaled)
@@ -19,6 +19,11 @@ Supports all 6 WorldTour Pro Workout Models + Polarized Recovery + 7-Day Microcy
   6. Environment                -> indoor (shorten duration 25-40%, -3% thermal offset) / outdoor
 """
 
+from pathlib import Path
+import sys
+import math
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.workout import Workout
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 import argparse
@@ -38,6 +43,14 @@ class RiderProfile:
     sex: str = "male"
 
     def analyze(self) -> Dict[str, Any]:
+        for field in ('weight_kg', 'cp60_watts', 'cp20_watts', 'cp1_watts'):
+            value = getattr(self, field)
+            if value is not None and (not math.isfinite(value) or value <= 0):
+                raise ValueError(f'{field} must be finite and positive')
+        if self.weekly_hours not in ('0-5', '5-10', '10+') or self.leg_strength not in ('none', 'moderate', 'heavy'):
+            raise ValueError('Unknown hours or strength category')
+        if self.age_group not in ('<30', '30-44', '45-54', '55+') or self.sex not in ('male', 'female'):
+            raise ValueError('Unknown age or sex category')
         if not self.cp60_watts and not self.cp20_watts:
             raise ValueError("Must provide either cp60_watts or cp20_watts.")
 
@@ -173,6 +186,8 @@ def generate_workout(analysis: Dict[str, Any], model: str = "lt2") -> Dict[str, 
     ftp = analysis["effective_ftp_w"]
     heavy_legs = "Heavy Leg" in analysis["modifiers"]["leg_strength"]
     model = model.lower()
+    if model not in ('lt1', 'fast_vo2', 'lt2', 'z3_z4_spikes', 'vo2_over_under', 'short_30_30', 'recovery'):
+        raise ValueError('Unknown workout model')
 
     if model == "lt1":
         wu = max(10, round(30 * end_mult))
@@ -192,15 +207,12 @@ def generate_workout(analysis: Dict[str, Any], model: str = "lt2") -> Dict[str, 
                 f"LT1 Block 2 {b2}x\n- {rep_m}m {high_p}%\n- {rec_s} 50%\n\n"
                 f"Cooldown\n- {cd}m 50-60%"
             )
-            dur_m = wu + total_reps * (rep_m + 3) + mid_rec + cd
         else:
             code = (
                 f"Warmup\n- {wu}m 50-60%\n\n"
                 f"Main Set {total_reps}x\n- {rep_m}m {low_p}-{high_p}%\n- {rec_s} 50%\n\n"
                 f"Cooldown\n- {cd}m 50-60%"
             )
-            dur_m = wu + total_reps * (rep_m + 3) + cd
-        avg_if = 0.74
         title = f"Model 1: LT1 Aerobic Capacity ({total_reps}x{rep_m}m @ {low_p}-{high_p}% FTP)"
 
     elif model == "fast_vo2":
@@ -215,8 +227,6 @@ def generate_workout(analysis: Dict[str, Any], model: str = "lt2") -> Dict[str, 
             f"Main Set {reps}x\n- 30s {spike}%\n- {_fmt_sec(steady_s)} {vo2_low}-{vo2_high}%\n- 15s {spike - 10}%\n- {rec_s} 50%\n\n"
             f"Cooldown\n- {cd}m 55-65%"
         )
-        dur_m = wu + reps * ((steady_s + 45 + 300 + extra_rec) / 60.0) + cd
-        avg_if = 0.78
         title = f"Model 2: Fast-Start VO2Max ({reps}x {_fmt_sec(steady_s + 45)})"
 
     elif model == "lt2":
@@ -235,8 +245,6 @@ def generate_workout(analysis: Dict[str, Any], model: str = "lt2") -> Dict[str, 
             f"Main Set {reps}x\n- {rep_m}m {low_p}-{high_p}%\n- {rec_s} 50%\n\n"
             f"Cooldown\n- 5m 75%\n- {cd}m 60-65%"
         )
-        dur_m = wu + (ramp_sets * 3) + 8 + reps * (rep_m + (90 + extra_rec) / 60.0) + 5 + cd
-        avg_if = 0.81
         title = f"Model 3: LT2 Threshold Stacking ({reps}x{rep_m}m @ {low_p}-{high_p}% FTP)"
 
     elif model == "z3_z4_spikes":
@@ -257,8 +265,6 @@ def generate_workout(analysis: Dict[str, Any], model: str = "lt2") -> Dict[str, 
             f"Alternating Block {b3_reps}x\n- 3m {z3_p + 3}%\n- 2m {z4_p}%\n\n"
             f"Cooldown\n- 8m 60-65%\n- 5m 50%"
         )
-        dur_m = wu + spikes_reps * 2 + rec1 + b2_high + b2_low + max(5, rec1 - 2) + b3_reps * 5 + 13
-        avg_if = 0.79
         title = f"Model 4: Z3/Z4 & Spikes ({spikes_reps}x Spikes + Over-Unders)"
 
     elif model == "vo2_over_under":
@@ -275,8 +281,6 @@ def generate_workout(analysis: Dict[str, Any], model: str = "lt2") -> Dict[str, 
             if b < blocks:
                 code += f"Block Recovery {b}\n- {rec_m}m 50%\n\n"
         code += f"Cooldown\n- {cd}m 55-63%"
-        dur_m = wu + blocks * (reps_per_block * 3) + (blocks - 1) * rec_m + cd
-        avg_if = 0.77
         title = f"Model 5: VO2Max 2m/1m Over-Unders ({blocks}x{reps_per_block} reps)"
 
     elif model == "short_30_30":
@@ -298,36 +302,34 @@ def generate_workout(analysis: Dict[str, Any], model: str = "lt2") -> Dict[str, 
         if not heavy_legs:
             code += f"VO2Max Booster\n- {booster_m}m {booster_p}%\n\n"
         code += f"Endurance Finish\n- {cd}m 55-63%"
-        dur_m = wu + reps * 2 + rec_m * 2 + (0 if heavy_legs else booster_m) + cd
-        avg_if = 0.76
         title = f"Model 6: 30/30s High-Float (2x{reps}m) + VO2 Booster"
 
-    else:  # recovery / post-bonk polarized Z2
+    else:  # easy endurance, not a treatment for acute fatigue or bonking
         wu = max(12, round(20 * end_mult))
         cd = max(10, round(15 * end_mult))
         main_m = max(25, round(45 * end_mult))
         code = (
             f"Warmup\n- {wu}m 50-58%\n\n"
-            f"Alactic Primers 6x\n- 8s 130%\n- 3m52s 58-62%\n\n"
             f"Polarized Z2 Cruise\n- {main_m}m 58-63%\n\n"
             f"Cooldown\n- {cd}m 50-55%"
         )
-        dur_m = wu + 24 + main_m + cd
-        avg_if = 0.63
-        title = "Polarized Z2 Recovery + 6x8s Alactic Primers"
+        title = "Easy Recovery Endurance (No Primers)"
 
-    est_tss = round((dur_m / 60.0) * (avg_if ** 2) * 100)
-    est_kj = round(ftp * avg_if * (dur_m / 60.0) * 3.6)
-    carbs_g_h = 35 if model == "recovery" else (85 if dur_m > 110 else (65 if avg_if >= 0.77 else 50))
-
+    workout = Workout.from_text(code)
+    metrics = workout.metrics(ftp)
+    dur_m = workout.duration_seconds / 60
+    carbs_g_h = 35 if model == "recovery" else (85 if dur_m > 110 else (65 if metrics["estimated_if"] >= .77 else 50))
     return {
         "model": model,
         "workout_name": title,
-        "total_duration_min": round(dur_m),
-        "estimated_tss": est_tss,
-        "estimated_work_kj": est_kj,
+        "total_duration_min": round(dur_m, 3),
+        "duration_seconds": workout.duration_seconds,
+        "estimated_tss": metrics["estimated_tss"],
+        "estimated_work_kj": metrics["work_kj"],
         "recommended_carbs_g_per_h": carbs_g_h,
         "intervals_icu_code": code,
+        "workout": workout.to_dict(),
+        "metrics": metrics,
     }
 
 

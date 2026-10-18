@@ -183,7 +183,7 @@ MCP在客户端的`mcpServers`中另外配置。[技能文档](https://geminicli
 
 **Claude Projects / ChatGPT Projects / Custom GPTs**
 
-上传`SKILL.md`、`references/`中的Markdown、`scripts/plan_metrics.py`及`src/tier_calculator.py`，再使用[Claude适配指令](adapters/claude-project-instructions.md)或[ChatGPT适配指令](adapters/chatgpt-custom-gpt-prompt.md)。能否运行计算器取决于客户端的代码执行能力。
+上传`SKILL.md`、Markdown参考文件以及`scripts/`、`src/`中的Python文件，再使用[Claude适配指令](adapters/claude-project-instructions.md)或[ChatGPT适配指令](adapters/chatgpt-custom-gpt-prompt.md)。支持执行时需保留目录结构；能否运行工具取决于客户端的代码执行能力。
 
 上传文件不会连接账号。网页环境需要受支持的远程MCP/插件连接或隧道；本仓库基础服务仅提供本地stdio，不会读取网页项目之外的本机配置。
 
@@ -201,10 +201,10 @@ MCP在客户端的`mcpServers`中另外配置。[技能文档](https://geminicli
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install "mcp<2"
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-本仓库基础MCP使用标准库发送HTTP请求。依赖必须装在客户端`command`使用的Python环境中；macOS/Linux请改用`.venv/bin/python`。
+使用Python 3.10+，依赖必须装在客户端`command`使用的同一个环境中，包含MCP 1.x、HTTPX和时区数据；macOS/Linux请改用`.venv/bin/python`。
 
 > [!IMPORTANT]
 > API Key只保存在私人本地配置中，不要发到聊天、README或Git仓库。下列账号与密钥均为占位符。现有MCP设置应合并保留，不要整文件覆盖。
@@ -256,13 +256,24 @@ Claude Desktop可从Settings → Developer → Edit Config打开配置；Claude 
 
 ### 使用流程
 
-**读取账号与训练史 → 预览课表 → 授权写入 → 核对解析与设备同步。**
+**读取训练史 → 保存档案与计划 → 检查约束 → 预览 → 授权更新 → 回读核对。**
 
-日历写入成功后，检查日期、步骤、功率和时长；Garmin/Wahoo/Zwift等设备端同步需另外确认。
+计划工具可识别重复ID、沿用修订前的课程ID，并在写入后核对解析功率与时长。预览失效时先刷新；Garmin/Wahoo/Zwift等设备端同步需另外确认。
 
 <a id="usage"></a>
 
 ## 4. Further Reading / 更多资料
+
+**统一课表核算 · 时间与负荷检查 · 档案和计划版本 · 日历查重与验证 · ZWO/ICS离线导出**
+
+无需连接账号，也能验证和导出上面的代表课：
+
+```powershell
+python -X utf8 scripts/training_plan.py validate --plan examples/portable-plan.json --profile examples/athlete-profile.json
+python -X utf8 scripts/training_plan.py export --plan examples/portable-plan.json --out .training-state/exports/showcase
+```
+
+档案中的训练史与恢复状态是测试用虚构数据，正式训练前请替换。[格式、反馈与命令说明](docs/IMPLEMENTATION.md#8-offline-export-and-commands)。
 
 - [训练规划规则](SKILL.md)：目标采集、排课、输出和反馈流程。
 - [周期化规划](references/goal-periodization.md)与[反馈循环](references/feedback-loop.md)：阶段安排、复测及骑后调整。

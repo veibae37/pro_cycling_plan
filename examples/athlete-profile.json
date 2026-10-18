@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "profile_id": "demo-rider",
+  "weight_kg": 70,
+  "ftp": {
+    "watts": 200,
+    "source": "Synthetic acceptance fixture; not an athlete test",
+    "date": "2026-10-15"
+  },
+  "language": "en",
+  "units": "metric",
+  "timezone": "Asia/Singapore",
+  "availability": {
+    "weekly_hours": 10,
+    "max_session_hours": 3,
+    "rest_days": [
+      0,
+      4
+    ]
+  },
+  "recent_weeks": [
+    {
+      "week_start": "2026-10-05",
+      "hours": 5,
+      "tss": 200
+    },
+    {
+      "week_start": "2026-10-12",
+      "hours": 5,
+      "tss": 200
+    }
+  ],
+  "thresholds": {
+    "lt1_pct": 70,
+    "lt2_pct": 100,
+    "source": "Explicit FTP proxy for demonstration; not measured LT1/LT2"
+  },
+  "wellness": {
+    "date": "2026-10-18",
+    "fatigue": "normal"
+  }
+}

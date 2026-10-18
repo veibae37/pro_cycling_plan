@@ -27,7 +27,7 @@ python -X utf8 scripts/plan_metrics.py --zone-minutes 648 24 48
 python -X utf8 scripts/plan_metrics.py --week examples/polarized-week.json
 ```
 
-支持 `- 10m 65%`、`- 45s 125-130%`、平铺的 `Nx` 循环；循环空行结束，恢复若在循环内就会每次重复，包括最后一次。爬坡要求写在段标题。斜坡功率、任意文字步骤、未定峰值冲刺与嵌套循环需先显式展开成支持的常数/范围步骤，不让解析器悄悄忽略。`--range-scenarios`额外算全低/全高情景；`--lt1-pct`、`--lt2-pct`只在用户提供或明确接受的阈值情景下使用。该工具不是活动文件读取器，不会修改原计算器或自动写日历。
+支持 `- 10m 65%`、`- 45s 125-130%`、平铺的 `Nx` 循环；循环空行结束，恢复若在循环内就会每次重复，包括最后一次。爬坡要求写在段标题。斜坡功率、任意文字步骤、未定峰值冲刺与嵌套循环需先显式展开成支持的常数/范围步骤，不让解析器悄悄忽略。`--range-scenarios`额外算全低/全高情景；`--lt1-pct`、`--lt2-pct`只在用户提供或明确接受的阈值情景下使用。该工具不是活动文件读取器。生成器、导出与 MCP 现共用相同的展开步骤及计算模块；CLI 本身不写日历。多周时间/负荷冲突用 `scripts/training_plan.py validate` 校验，格式见 [实现说明](../docs/IMPLEMENTATION.md#5-portable-profiles-and-feasibility)。
 
 ## PI与极化 / 金字塔
 

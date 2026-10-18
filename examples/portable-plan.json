@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "plan_id": "offline-showcase",
+  "ftp": 200,
+  "power_range_scenario": "midpoint",
+  "sessions": [
+    {
+      "session_id": "climb-01",
+      "date": "2026-11-03",
+      "name": "Climbing and surges - 60 minutes",
+      "workout": "Warmup\n- 5m 50%\n- 5m 60%\n- 3m 65%\n- 2m 80%\n\nClimb repeats 2x\n- 2m 110%\n- 4m 50%\n\nLast climb\n- 2m 110%\n\nEasy endurance\n- 21m 65%\n\nCooldown\n- 10m 50%\n"
+    }
+  ]
+}

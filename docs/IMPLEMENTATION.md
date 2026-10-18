@@ -1,12 +1,12 @@
 # Implementation Details
 
-This document explains the planning workflow, numerical methods, MCP behavior and current implementation limits of Pro Cycling Plan & Workouts. It describes the code shipped in this repository; local showcase extensions are identified separately.
+This document explains the planning workflow, numerical methods, MCP behavior and current implementation limits of Pro Cycling Plan & Workouts. It describes the portable code shipped in this repository. The agent authors plans; deterministic tools calculate, validate, version, export and synchronize them.
 
 [English README](../README.en.md) · [Chinese README](../README.md)
 
 ## 1. Components and responsibilities
 
-The system combines agent instructions with two independent Python tools and an optional account connection:
+The system combines agent instructions with a shared Python workout representation and an optional account connection:
 
 - **[SKILL.md](../SKILL.md) and [references](../references/):** define intake, goal-based periodization, workout selection, output requirements and feedback handling. The host agent reads and applies these instructions.
 - **[src/tier_calculator.py](../src/tier_calculator.py):** implements `RiderProfile.analyze()`, fixed workout generation and a predefined weekly summary.
@@ -83,18 +83,21 @@ Model-specific rounding, minimum repetitions, duration floors and intensity floo
 
 ### Models and weekly summaries
 
-Supported model identifiers are `lt1`, `fast_vo2`, `lt2`, `z3_z4_spikes`, `vo2_over_under`, `short_30_30` and `recovery`. The last model currently emits short primers as well as easy riding; the agent must not use that template blindly when fatigue calls for rest or genuinely easy recovery.
+Supported model identifiers are `lt1`, `fast_vo2`, `lt2`, `z3_z4_spikes`, `vo2_over_under`, `short_30_30` and `recovery`. The recovery model now contains only easy riding, without forced sprint primers. Rest may still be more appropriate when fatigue is high. Unknown model names fail instead of falling back to recovery.
 
 `generate_weekly_microcycle()` selects predefined days/models using the weekly-hours category. It does not solve for the requested hours, TSS, distribution, race goals or strength-training calendar. Its generated sessions also need review against the skill's planning rules.
 
-The fixed generator estimates TSS and work using a model-specific assumed IF:
+### One workout representation
 
-```text
-estimated_TSS = round(hours × assumed_IF² × 100)
-estimated_kJ = round(FTP × assumed_IF × hours × 3.6)
+Every generated or imported workout is expanded into immutable `Workout`/`Step` objects in [workout.py](../src/workout.py). Each step stores exact integer seconds and a low/high percentage of FTP. Metrics, native calendar text and ZWO exports use those same steps, including final-repeat recoveries and age-related recovery extensions.
+
+The generator preserves its existing result keys and adds `duration_seconds`, `workout` (schema version 1) and `metrics`. `total_duration_min` is now a decimal display value; use exact seconds for writes. TSS and work no longer use fixed model IF assumptions. Carbohydrate recommendations remain template heuristics.
+
+```json
+{"schema_version": 1, "steps": [{"duration_seconds": 60, "low_pct": 50, "high_pct": 60}]}
 ```
 
-The second expression is a rough proxy, not integration of the emitted power steps. Some reported duration formulas also differ from their expanded text. Fixed carbohydrate recommendations are duration/model heuristics, not individualized fueling prescriptions. Recalculate the final text with the separate metrics estimator before reporting it as a step-based estimate.
+Range scenarios are `low`, `midpoint` (default) and `high`. Calendar and ZWO outputs resolve ranges into the chosen constant target, matching the calculated scenario. A range is not exported as a ramp.
 
 ## 4. Workout parsing and numerical estimates
 
@@ -151,61 +154,115 @@ If any zone has zero time, the tool reports PI as `null`; it does not add an art
 
 Without individual physiological thresholds, either omit distribution or explicitly label a proxy scenario. The showcase's 70%/100% FTP boundaries are such a proxy, not measured LT1/LT2. Seven FTP power zones are not interchangeable with this three-zone system. Short-interval power-zone time does not measure high-oxygen-uptake time, and a higher PI alone is not evidence of a better plan.
 
-## 5. MCP transport and account operations
+## 5. Portable profiles and feasibility
 
-### Runtime and authentication
+The [profile fixture](../examples/athlete-profile.json) and [portable plan](../examples/portable-plan.json) reuse the README's 60-minute workout. Profile history and recovery are **synthetic acceptance fixtures**, not observed athlete data. Replace them before use. Their date-dependent warnings are intentional once these dates become stale.
 
-The base server runs over local stdio and imports `FastMCP` from the MCP 1.x SDK. The README pins `mcp<2` for that interface. Dependencies must be installed in the interpreter configured by the host client.
+A profile requires `schema_version: 1`, `profile_id`, `weight_kg`, `ftp: {watts, source, date}`, `timezone` and `availability: {weekly_hours, max_session_hours, rest_days}`. Dates use `YYYY-MM-DD`; rest days use Monday=0 through Sunday=6. Optional `daily_hours` maps string weekday numbers to hour caps. `language` is `en`/`zh`; `units` is `metric`/`imperial`, but stored power and weight always use W and kg. The host agent uses these preferences; saving them does not translate files or change client settings.
 
-At process startup it reads `INTERVALS_ATHLETE_ID` (default `i0`) and `INTERVALS_API_KEY` (default empty). Requests use the Intervals.icu athlete API over HTTPS, HTTP Basic authentication with username `API_KEY`, JSON payloads and a 15-second timeout. The base implementation uses Python's standard-library HTTP client.
+Optional inputs:
 
-Keep real credentials in private client configuration. An installed skill, a successful server handshake, a successful account read, a calendar write and a device sync are distinct verification steps.
+- `recent_weeks`: Monday `week_start`, observed `hours` and `tss`; missing values may be null.
+- `thresholds`: `lt1_pct`, `lt2_pct`, and an explicit measured/proxy `source`.
+- `wellness`: `date` and `fatigue` (`normal`, `high` or `unknown`).
 
-### Exposed tools
+A plan requires `schema_version: 1`, `plan_id`, `ftp` and `sessions`. Each session needs stable `session_id`, `date`, `name` and `workout` (supported native text or canonical JSON). Optional session fields are `sport` (`Ride`/`VirtualRide`) and `start_time` (`HH:MM`, athlete-local). Preserve IDs when revising steps or dates; use a new plan ID for a different training block. IDs accept 1-64 letters, numbers, hyphens and underscores.
 
-- **`get_athlete_profile()`** requests the athlete endpoint and returns ID, name, weight and sport settings. FTP-related fields depend on returned settings; eFTP and W′ are not explicitly extracted by this wrapper.
-- **`get_recent_wellness_and_activities(oldest_date, newest_date)`** requests `/activities` and `/wellness` for the date range. Missing activities may reflect data-source restrictions or incomplete syncing. Returned load metrics do not independently diagnose a fatigue cause.
-- **`create_intervals_workout(target_date, name, description_code, moving_time_sec=4500)`** sends `POST /events` with category `WORKOUT`, local midnight on the target date, type `Ride`, name, description and duration in seconds. The caller must pass the duration of the final expanded workout.
-- **`generate_and_push_pro_workout(...)`** calls the fixed calculator and immediately posts the result. It defaults to CP20 input; set `is_cp20=false` for FTP/CP60. Indoor workouts use `VirtualRide`, outdoor workouts `Ride`. It does not read recent wellness or offer a preview-only mode, and it passes through the fixed generator's reported duration and estimates.
+Plan options include `power_range_scenario`, `weekly_tss_range`, `distribution` and `pi_min`. Distribution uses the profile's declared thresholds. This validator checks a supplied plan; it does not optimize an eight-week schedule.
 
-### Write and verification boundaries
+[assess_plan](../src/planning.py) reports `ready`, `review` or `blocked`, weekly estimates, issues and suggested adjustments:
 
-The base server does not implement calendar lookup, update/delete tools, stable external IDs, duplicate prevention or safe retries after an ambiguous write response. Check the calendar before repeating an uncertain request.
+- **Hard conflicts:** fixed rest days; ride, combined daily or weekly hour caps; TSS above the requested upper bound; profile/plan FTP mismatch; future FTP date; undefined TSS from a sub-30-second session; high reported fatigue alongside quality work.
+- **Review:** missing/stale history or recovery, aged FTP, load increases, consecutive quality days, TSS below a requested minimum, or unavailable/unmet distribution targets. Missing observations are not converted to zero or normal recovery.
+- **Progression:** compare the first week with the mean of available observations from up to six preceding weeks, then successive planned weeks. `load_review_factor` defaults to 1.25 and is configurable. This is a review trigger, not a proven safe progression rate.
+- **Quality spacing:** two accumulated minutes at >=105% FTP, or ten at >=90%, marks a quality day for this check. This is a scheduling heuristic, not a physiological diagnosis.
 
-The README showcase used a separate local extension for batch writes, stable identifiers and calendar read-back. Those capabilities are not shipped as part of the four base tools. The public showcase is evidence of that workflow, not a claim that the base server gained those features.
+Correct hard conflicts or explicitly revise their underlying constraints. Warnings may be accepted with a reason grounded in the user's actual context. Existing write authorization remains valid; the preview token does not require a redundant permission question.
 
-A calendar event alone does not prove that its structured steps parsed correctly. Verify date, duration, power targets, expanded repeats and recovery counts. Garmin, Wahoo, Zwift and other device integrations require separate verification. Future fitness/fatigue projections in the screenshot are not completed-training outcomes.
+## 6. MCP transport and verified sync
 
-### Connection diagnosis
+Use Python 3.10+ and install [requirements.txt](../requirements.txt) in the interpreter configured by the host. The local stdio server uses MCP 1.x `FastMCP`, HTTPX, a 30-second timeout and an identifying User-Agent. Windows needs `tzdata` for IANA timezone validation. Set `INTERVALS_ATHLETE_ID` (default `0`, the API-key owner) and `INTERVALS_API_KEY`. Errors omit credentials, response bodies and private URLs; HTTPX URL logging is suppressed.
 
-- Missing `mcp.server` or `FastMCP`: check the exact interpreter and SDK compatibility.
-- Startup failure: inspect absolute paths, JSON/TOML syntax and host logs.
-- Missing API key: check the server's environment configuration, then restart it.
-- HTTP 401/403: inspect credentials, account permissions and the response source; network protection can also generate a 403.
-- Calendar/device mismatch: inspect parsed structure before investigating downstream sync.
+Eleven tools are exposed:
 
-## 6. State, feedback and privacy
+- `get_athlete_profile`: identity, weight and sport settings; FTP/eFTP/W-prime availability depends on the returned settings.
+- `get_recent_wellness_and_activities`: dated actual activity and wellness records.
+- `get_calendar_events`: dated planned events, parsed steps and resolved power.
+- `preview_training_plan(plan, profile)`: read-only feasibility/calendar comparison and `preview_hash`.
+- `sync_training_plan(plan, profile, expected_preview_hash, review_note="")`: authorized upsert followed by verification. Warnings require a reason; hard conflicts block writes.
+- `save_athlete_profile`, `save_training_plan`, `read_training_state`, `record_training_feedback`: private records described below.
+- `create_intervals_workout`: compatibility single-session writer. Now requires explicit `ftp_watts`, derives exact seconds and rejects mismatched `moving_time_sec`.
+- `generate_and_push_pro_workout`: compatibility fixed-template generator/writer. Defaults to CP20; use `is_cp20=false` for FTP/CP60.
 
-The [feedback workflow](../references/feedback-loop.md) uses whole-session/final-set RPE, completion, fueling, muscular or breathing limitations, sleep and heat context. A rider's suspected cause is a hypothesis, not a diagnosis from a single failed workout.
+The two compatibility writers use the reliable sync core but do not perform full plan feasibility checks. Prefer the plan preview/sync tools for multiweek work.
 
-When writable storage is available, actual feedback and preferences can be saved to `.training-state/state.json` in the training directory. This directory is Git-ignored. Without persistence, provide a copyable continuation summary rather than claiming automatic memory across new chats.
+### Write contract
 
-The metrics tool and fixed generator do not automatically load this state. The agent uses it to revise future sessions. Completed activities must not be rewritten to fit a new plan, and a local revision is not proof that the calendar was updated.
+1. Expand and validate the final plan, assess constraints and list existing calendar events.
+2. Use stable `external_id` values `pcw-v1:<plan_id>:<session_id>`. The first description line identifies ownership, followed by a blank line and native steps. Do not send an empty `workout_doc`.
+3. Preview `upsert`, `update` or `unchanged`. Absence in a lookup window does not prove global absence, so it is called upsert. Saved revisions widen lookup to include previous session dates.
+4. Bind the preview hash to plan, profile, assessment and calendar snapshot; recheck before writing. Changed inputs return `stale_preview`. This reduces accidental overwrites; the external API offers no atomic compare-and-swap guarantee.
+5. POST only pending events to `/events/bulk?upsert=true`, then read the calendar again. Verify date, sport, name, description, exact seconds, expanded power targets and resolved watts against planned FTP. HTTP 200 alone is insufficient.
+6. After a timeout or partial application, read back and report per-session results without automatically retrying the write. A later explicitly initiated sync previews current state and upserts only remaining changes.
 
-Keep `.env`, `.venv/`, private account responses and raw training state out of public commits. Examples should contain only intentionally published data and clearly distinguish assumptions, planned estimates, observed results and platform projections.
+`verified` means the calendar representation and parsed targets match. Wrong account FTP, absent parsed steps or platform push errors fail verification. Delivery to Garmin/Wahoo/Zwift requires separate checking.
 
-## 7. Source map and maintenance
+Duplicate external IDs and ownership collisions inside the lookup range block writes. Intervals.icu matches external IDs within the application that created them; keep the same connection/application for repeat imports. Moved sessions keep their stable ID. Distinct sessions on one date need distinct IDs. The compatibility single writer derives its default ID from date/name; pass an explicit ID when revising either.
 
-- Change goal mapping, phases and assessment guidance in [goal-periodization.md](../references/goal-periodization.md).
-- Change load/distribution guidance in [load-and-distribution.md](../references/load-and-distribution.md).
-- Maintain source workouts and ambiguities in [image-workouts.md](../references/image-workouts.md).
-- Change fixed rider analysis and workout generation in [tier_calculator.py](../src/tier_calculator.py).
-- Change supported text and numerical methods in [plan_metrics.py](../scripts/plan_metrics.py).
-- Change account requests and exposed tools in [intervals_mcp_server.py](../mcp/intervals_mcp_server.py).
-- Keep the Chinese and English README showcases, commands and linked resources aligned when behavior changes.
+Removed sessions appear as `retained_events` and **are not deleted**. Other events and completed activities are not rewritten. Do not claim cancellation reached the calendar without a separate removal. Legacy showcase IDs are not automatically adopted into the new namespace.
 
-The reference documents contain the underlying training guidance and external sources. The implementation above is a planning aid; it does not guarantee adaptation, physiological classification or deployment-wide behavior across every host.
+External contract: [Intervals.icu upload/upsert guide](https://forum.intervals.icu/t/uploading-planned-workouts-to-intervals-icu/63624) and [API schema](https://intervals.icu/api/v1/docs).
+
+## 7. Private revisions and feedback
+
+[TrainingStore](../src/state.py) uses Git-ignored `.training-state/`. The MCP default resolves relative to the repository; set `CYCLING_STATE_DIR` to select another private directory. The CLI default is relative to its current directory; pass `--state-dir` before the subcommand to change it.
+
+- `profiles/<profile_id>/`: immutable numbered snapshots with reason, timestamp and hash chain.
+- `plans/<plan_id>/`: immutable canonical revisions, linked profile revision/hash, reason, and added/removed/changed session IDs plus changed settings.
+- `actuals/<plan_id>/`: append-only feedback linked to the current plan revision when recorded, or an explicit `plan_revision` for a prior prescription. Optional actual seconds, work and TSS are compared with that saved prescription. Later revisions preserve the original comparison.
+- `syncs/<plan_id>/`: plan hash, sync result and accepted warning reason from the new plan sync tool.
+
+Writes publish complete JSON atomically under a short directory lock, without intentionally replacing an existing revision. Concurrent saves may fail and require reloading. After a process crash, confirm no writer is running before removing a stale `.write-lock`. Hashes support tracing, not authentication or encryption.
+
+The [feedback workflow](../references/feedback-loop.md) guides interpretation and changes. Tools store supplied observations; they do not diagnose fatigue, run unattended or automatically revise future training. Saved revisions are separate from calendar writes. Existing `.training-state/state.json` is preserved; deliberately migrate its real values instead of overwriting it.
+
+## 8. Offline export and commands
+
+After installing dependencies, run from the repository root:
+
+```powershell
+python -X utf8 scripts/training_plan.py validate --plan examples/portable-plan.json --profile examples/athlete-profile.json
+python -X utf8 scripts/training_plan.py export --plan examples/portable-plan.json --out .training-state/exports/showcase
+python -X utf8 scripts/training_plan.py save-profile --profile examples/athlete-profile.json --reason "Initial synthetic fixture"
+python -X utf8 scripts/training_plan.py save-plan --plan examples/portable-plan.json --profile-id demo-rider --reason "Initial synthetic fixture"
+python -X utf8 scripts/training_plan.py history --kind plans --id offline-showcase
+```
+
+Validation exit codes: 0=ready, 1=review, 2=blocked/invalid. JSON explains each issue. Fixture dates intentionally become stale. `feedback --plan-id ... --session-id ... --feedback <private.json>` records actual observations; optional `--plan-revision` selects an earlier prescription. Feedback accepts RPE 0-10, completion 0-1 and optional actual `duration_seconds`, `work_kj`, `tss`, `carbs_g`, `sleep_hours` and notes.
+
+Exports need no account/network. Each bundle contains per-session ZWO files, `plan.ics` and a manifest recording the canonical hash and range scenario. Choose a fresh directory if matching files exist.
+
+ZWO uses XML `SteadyState` elements, integer seconds, fractions of FTP and expanded repetitions. Set the receiving app/device FTP to the planned value. Source ramps or unbounded sprints must first be represented explicitly; exports do not invent targets.
+
+ICS uses stable UIDs, escaped text, CRLF and UTF-8 folding at 75 octets under [RFC 5545](https://www.rfc-editor.org/rfc/rfc5545). Sessions are local-date **all-day events**; duration and optional suggested start time are in descriptions. ICS is a schedule preview, not a device workout or timed alarm. The calendar app decides reimport behavior. Optional nonnegative integer plan `revision` supplies the ICS sequence.
+
+## 9. Validation and source map
+
+```powershell
+python -m unittest discover -s tests -v
+python tests/stdio_smoke.py
+```
+
+Unit tests cover arithmetic, model variants, feasibility, persistence, export and mocked calendar failure scenarios. The separate smoke test uses real MCP stdio and synthetic private records without account writes. See [acceptance results](ACCEPTANCE.md) for this update's checks.
+
+- Planning guidance: [SKILL.md](../SKILL.md), [goal periodization](../references/goal-periodization.md), [load and distribution](../references/load-and-distribution.md), [feedback](../references/feedback-loop.md).
+- Model heuristics: [tier_calculator.py](../src/tier_calculator.py).
+- Shared steps and arithmetic: [workout.py](../src/workout.py), [metrics.py](../src/metrics.py); `scripts/plan_metrics.py` re-exports its original public functions.
+- Validation, persistence, export and sync: the corresponding modules in `src/`.
+- Account tools: [intervals_mcp_server.py](../mcp/intervals_mcp_server.py).
+
+Keep Chinese/English README commands aligned. Keep credentials, raw account responses and training state out of public commits. Do not confuse planned estimates, platform projections and completed-training outcomes.
 
 ---
 
-[Return to the English README](../README.en.md) · [Return to the Chinese README](../README.md)
+[English README](../README.en.md) · [Chinese README](../README.md)

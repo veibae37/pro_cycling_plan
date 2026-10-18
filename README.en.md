@@ -185,7 +185,7 @@ Configure MCP separately in the client's `mcpServers` settings. [Skills document
 
 **Claude Projects / ChatGPT Projects / Custom GPTs**
 
-Upload `SKILL.md`, the Markdown files in `references/`, `scripts/plan_metrics.py` and `src/tier_calculator.py`. Then use the [Claude adapter](adapters/claude-project-instructions.md) or [ChatGPT adapter](adapters/chatgpt-custom-gpt-prompt.md). Calculator execution depends on the client's code-execution capabilities.
+Upload `SKILL.md`, the Markdown references and the Python files in `scripts/` and `src/`, preserving their directory structure when execution is supported. Then use the [Claude adapter](adapters/claude-project-instructions.md) or [ChatGPT adapter](adapters/chatgpt-custom-gpt-prompt.md). Calculator execution depends on the client's code-execution capabilities.
 
 Uploading files does not connect an account. Web environments need a supported remote MCP/plugin connection or tunnel. The base server in this repository offers local stdio only; uploading it does not make local client configuration available to a web project.
 
@@ -203,10 +203,10 @@ Uploading files does not connect an account. Web environments need a supported r
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install "mcp<2"
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-The base MCP server uses the standard library for HTTP requests. Install dependencies in the same Python environment used by the client's `command`. On macOS/Linux, use `.venv/bin/python` instead.
+Use Python 3.10+. Install dependencies in the same environment used by the client's `command`. Requirements include MCP 1.x, HTTPX and timezone data. On macOS/Linux, use `.venv/bin/python` instead.
 
 > [!IMPORTANT]
 > Keep API Keys in private local configuration, never in chat, this README or Git. Account IDs and keys below are placeholders. Merge entries into existing MCP settings instead of replacing the entire file.
@@ -258,13 +258,25 @@ In Claude Desktop, open Settings → Developer → Edit Config. Claude Code uses
 
 ### Workflow
 
-**Read account and training history → Preview → Authorize writes → Check parsed steps and device sync.**
+**Read history → Save profile and plan → Check constraints → Preview → Authorized upsert → Read back parsed steps.**
 
-After a successful calendar write, check dates, steps, power targets and durations. Verify Garmin/Wahoo/Zwift device sync separately.
+The plan tools detect duplicate IDs, preserve session IDs across revisions and verify parsed power/duration after writes. A changed preview must be refreshed. Verify Garmin/Wahoo/Zwift delivery separately.
 
 <a id="usage"></a>
 
 ## 4. Further Reading
+
+**Exact workout metrics · Constraint checks · Versioned profiles/plans · Verified calendar upserts · Offline ZWO/ICS**
+
+Export the showcase workout without connecting an account:
+
+```powershell
+python -X utf8 scripts/training_plan.py validate --plan examples/portable-plan.json --profile examples/athlete-profile.json
+python -X utf8 scripts/training_plan.py export --plan examples/portable-plan.json --out .training-state/exports/showcase
+```
+
+The profile is a synthetic fixture; replace its history and recovery inputs before training. [Formats, feedback and command guide](docs/IMPLEMENTATION.md#8-offline-export-and-commands).
+
 
 - [Planning instructions](SKILL.md): goals, workout selection, output and feedback workflow.
 - [Periodization](references/goal-periodization.md) and [feedback loop](references/feedback-loop.md): phases, reassessment and post-ride changes.

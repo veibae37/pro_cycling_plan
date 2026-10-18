@@ -1,0 +1,4 @@
+# Core arithmetic/state/exports use the Python standard library (Python >=3.10).
+mcp>=1.30,<2
+httpx>=0.28,<1
+tzdata>=2025.2

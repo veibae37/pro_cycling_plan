@@ -124,12 +124,6 @@ Prefer a valid FTP when available. `CP20 × 0.95` is only an estimate, and CP60 
 - **Strength and recovery:** leg training, sleep, soreness, heat and recent workout quality all affect recovery needs.
 - **Age and setting:** adjust to experience and individual response; account for cooling and continuous pedaling indoors, and terrain, gearing and safety outdoors.
 
-### Available workout structures
-
-The base library includes low-intensity endurance, fast-start VO2, sustained threshold, Z3/Z4 with spikes, 2m/1m alternations and 30/30 micro-intervals. The [image-derived workout library](references/image-workouts.md) preserves source structure, terrain and unknowns before scaling.
-
-The 80–85% FTP labels in older material must not automatically be treated as individual LT1 or low-intensity Z2. Establish individual thresholds and a consistent zone system before reporting distribution.
-
 <a id="installation"></a>
 
 ## 2. Installation
@@ -280,7 +274,6 @@ The profile is a synthetic fixture; replace its history and recovery inputs befo
 
 - [Planning instructions](SKILL.md): goals, workout selection, output and feedback workflow.
 - [Periodization](references/goal-periodization.md) and [feedback loop](references/feedback-loop.md): phases, reassessment and post-ride changes.
-- [Image-derived workouts](references/image-workouts.md): source structure, terrain and scaling notes.
 
 ---
 

@@ -122,12 +122,6 @@ python -X utf8 scripts/plan_metrics.py --workout examples/climbing-surges-60m.tx
 - **力量与恢复**：腿部力量训练、睡眠、酸痛、热环境与最近完成质量都占恢复预算。
 - **年龄与场景**：结合训练经历与个人反应调整；室内考虑散热和连续踩踏，户外考虑地形、齿比和安全。
 
-### 可选课表结构
-
-基础库包含低强度耐力、快启VO2、持续阈值、Z3/Z4与Spikes、2m/1m交替、30/30微间歇等结构。另有[图片课表库](references/image-workouts.md)，用于保留原训练结构、地形和未知项后再缩放。
-
-旧材料中的80–85%FTP不能直接认定为个人LT1或低强度Z2；采用个人阈值和统一分区后再统计分布。
-
 <a id="installation"></a>
 
 ## 2. Installation / 安装技能
@@ -277,7 +271,6 @@ python -X utf8 scripts/training_plan.py export --plan examples/portable-plan.jso
 
 - [训练规划规则](SKILL.md)：目标采集、排课、输出和反馈流程。
 - [周期化规划](references/goal-periodization.md)与[反馈循环](references/feedback-loop.md)：阶段安排、复测及骑后调整。
-- [图片课表库](references/image-workouts.md)：来源训练结构、地形与缩放说明。
 
 ---
 

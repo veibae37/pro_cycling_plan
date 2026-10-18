@@ -1,10 +1,10 @@
 ![Pixel-art cyclists climbing a mountain road](docs/images/pro-cycling-banner.jpg)
 
+**简体中文** · [English](README.en.md)
+
 # Pro Cycling Plan & Workouts
 
 **目标导向排课 · 职业课表缩放 · 负荷核算 · Intervals.icu MCP**
-
-Adaptive cycling plans built around your goals, available time and recovery, with reusable Agent Skills, a local calculator and optional Intervals.icu integration.
 
 从 FTP、爬坡到反复拉扯与长距离耐受：先确定目标与约束，再安排周期、选择课表，并根据骑后反馈调整。
 
@@ -311,3 +311,7 @@ TSS按每课`hours × (NP / FTP)² × 100`计算后相加，不用平均功率�
 - **部分画像参数未暴露**：`RiderProfile`支持`sex`，当前CLI/MCP生成接口仍使用默认值。
 - **指标有适用范围**：指标估算器不是活动文件读取器；滑行、热环境、真实冲刺和个体阈值会改变实绩，不能只靠TSS或PI判定训练质量。
 - **账号连接独立配置**：基础MCP仅提供本地stdio，没有远程部署、多用户OAuth或设备同步验证；安装技能本身不能证明账号读写成功。
+
+---
+
+**简体中文** · [English](README.en.md)

@@ -24,6 +24,7 @@ import sys
 import math
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.workout import Workout
+from src.power_profile import GROUP_FACTORS, GROUP_SOURCE, prepare_intake
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 import argparse
@@ -41,6 +42,9 @@ class RiderProfile:
     age_group: str = "<30"           # "<30", "30-44", "45-54", "55+"
     indoor: bool = True
     sex: str = "male"
+    performance_group: Optional[str] = None
+    group_basis: Optional[str] = None
+    cp20_is_maximal: bool = False
 
     def analyze(self) -> Dict[str, Any]:
         for field in ('weight_kg', 'cp60_watts', 'cp20_watts', 'cp1_watts'):
@@ -54,22 +58,20 @@ class RiderProfile:
         if not self.cp60_watts and not self.cp20_watts:
             raise ValueError("Must provide either cp60_watts or cp20_watts.")
 
-        prelim_ftp = self.cp60_watts if self.cp60_watts else (self.cp20_watts * 0.95)
-        cp1_ratio = (self.cp1_watts / prelim_ftp) if self.cp1_watts else None
-
         if self.cp60_watts:
             effective_ftp = round(self.cp60_watts, 1)
-            ftp_source = "CP60 (100%)"
+            ftp_source = "Supplied FTP/P60 working reference; verify protocol/date"
         else:
-            if cp1_ratio and cp1_ratio > 2.2:
-                effective_ftp = round(self.cp20_watts * 0.92, 1)
-                ftp_source = "CP20 * 0.92 (High Anaerobic VLamax Adjustment)"
-            elif cp1_ratio and cp1_ratio < 1.85:
-                effective_ftp = round(self.cp20_watts * 0.96, 1)
-                ftp_source = "CP20 * 0.96 (Diesel/TT Adjustment)"
-            else:
-                effective_ftp = round(self.cp20_watts * 0.95, 1)
-                ftp_source = "CP20 * 0.95 (Standard)"
+            if self.performance_group not in GROUP_FACTORS:
+                raise ValueError('CP20 alone needs power-profile follow-up or an explicitly selected performance group; no automatic 0.95 conversion')
+            if not self.cp20_is_maximal:
+                raise ValueError('Group P60 prediction requires a declared maximal P20 effort; ordinary training is not a maximal test')
+            prepare_intake(self.cp20_watts, self.weight_kg,
+                           performance_group=self.performance_group, group_basis=self.group_basis)
+            factor = GROUP_FACTORS[self.performance_group]
+            effective_ftp = round(self.cp20_watts * factor, 1)
+            ftp_source = f'Provisional P60 prediction: P20 * {factor} ({self.performance_group}; {self.group_basis}); not measured FTP/LT2'
+        cp1_ratio = (self.cp1_watts / effective_ftp) if self.cp1_watts else None
 
         w_kg = round(effective_ftp / self.weight_kg, 2)
         cp1_w_kg = round(self.cp1_watts / self.weight_kg, 2) if self.cp1_watts else None
@@ -145,6 +147,9 @@ class RiderProfile:
             "weight_kg": self.weight_kg,
             "effective_ftp_w": effective_ftp,
             "ftp_source": ftp_source,
+            "ftp_status": 'supplied_working_reference' if self.cp60_watts else 'provisional_group_p60_prediction',
+            "ftp_research_source": None if self.cp60_watts else GROUP_SOURCE,
+            "tier_evidence": 'legacy_template_heuristic_not_study_group',
             "ftp_w_kg": w_kg,
             "cp1_watts": self.cp1_watts,
             "cp1_w_kg": cp1_w_kg,
@@ -380,6 +385,9 @@ if __name__ == "__main__":
     parser.add_argument("--cp60", type=float, default=None, help="CP60 / FTP in watts")
     parser.add_argument("--cp20", type=float, default=None, help="CP20 in watts")
     parser.add_argument("--cp1", type=float, default=None, help="Optional CP1 (1-min power) in watts")
+    parser.add_argument('--performance-group', choices=list(GROUP_FACTORS), default=None)
+    parser.add_argument('--group-basis', choices=['vo2max_report', 'self_report', 'wkg_heuristic'], default=None)
+    parser.add_argument('--cp20-maximal', action='store_true', help='Declare P20 a maximal test/effort, not ordinary training')
     parser.add_argument("--hours", type=str, default="5-10", choices=["0-5", "5-10", "10+"])
     parser.add_argument("--strength", type=str, default="none", choices=["none", "moderate", "heavy"])
     parser.add_argument("--age", type=str, default="<30", choices=["<30", "30-44", "45-54", "55+"])
@@ -393,6 +401,11 @@ if __name__ == "__main__":
     parser.add_argument("--weekly", action="store_true", help="Generate full weekly polarized microcycle")
     args = parser.parse_args()
 
+    if args.cp20 and not args.cp60 and (not args.performance_group or not args.cp20_maximal):
+        print(json.dumps(dict(status='needs_power_profile', intake=prepare_intake(args.cp20, args.weight)),
+                         indent=2, ensure_ascii=False))
+        sys.exit(0)
+
     rider = RiderProfile(
         weight_kg=args.weight,
         cp60_watts=args.cp60,
@@ -402,6 +415,9 @@ if __name__ == "__main__":
         leg_strength=args.strength,
         age_group=args.age,
         indoor=not args.outdoor,
+        performance_group=args.performance_group,
+        group_basis=args.group_basis,
+        cp20_is_maximal=args.cp20_maximal,
     )
     analysis = rider.analyze()
     output: Dict[str, Any] = {"analysis": analysis, "workout": generate_workout(analysis, model=args.model)}

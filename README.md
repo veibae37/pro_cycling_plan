@@ -112,7 +112,7 @@ python -X utf8 scripts/plan_metrics.py --workout examples/climbing-surges-60m.tx
 - **Scaled · ≥3.2 且 <4.5 W/kg**：减少主组容量、适当延长恢复，常用75–120分钟候选课。
 - **Double-Scaled · <3.2 W/kg**：进一步减少主组容量和高强度峰值，常用50–75分钟候选课。
 
-有有效FTP时优先使用；`CP20 × 0.95` 仅是估计，CP60也应结合测试协议理解。CP1/FTP只作短时功率倾向参考，不能诊断W′、VLamax或肌纤维类型。代码中的其他启发式系数需通过一致协议复测校核。
+有有效FTP时优先使用；只给CP20时先补问可选成绩或读取历史曲线，不统一默认乘0.95。CP60也需核对测试协议，CP1/FTP仅作短时能力参考。分组预测及功体比分档的依据和限制见[功率画像流程](references/power-profile-workflow.md)。
 
 ### 还要考虑哪些条件
 
@@ -271,6 +271,7 @@ python -X utf8 scripts/training_plan.py export --plan examples/portable-plan.jso
 
 - [训练规划规则](SKILL.md)：目标采集、排课、输出和反馈流程。
 - [周期化规划](references/goal-periodization.md)与[反馈循环](references/feedback-loop.md)：阶段安排、复测及骑后调整。
+- [功率画像与追问流程](references/power-profile-workflow.md)：可选6s至60m成绩、默认历史回溯MCP、按训练水平给出P60候选；附研究依据与[阈值评估路线](references/power-curve-assessment-plan.md)。
 
 ---
 

@@ -114,7 +114,7 @@ The default FTP power-to-weight heuristics below select a scaling template. They
 - **Scaled · ≥3.2 and <4.5 W/kg:** reduce main-set volume and allow more recovery; candidate sessions commonly last 75–120 minutes.
 - **Double-Scaled · <3.2 W/kg:** reduce main-set volume and high-intensity peaks further; candidate sessions commonly last 50–75 minutes.
 
-Prefer a valid FTP when available. `CP20 × 0.95` is only an estimate, and CP60 also needs its testing protocol considered. CP1/FTP offers a short-duration power reference; it cannot diagnose W′, VLamax or muscle-fiber type. Other heuristic factors in the code need checking through repeatable testing.
+Prefer a valid FTP when available. CP20-only input now asks for optional efforts or authorized historical curves instead of defaulting to 0.95. Check CP60 protocols; CP1/FTP is only a short-duration reference. See the [power-profile workflow](references/power-profile-workflow.md) for group predictions, W/kg scaling and their limits.
 
 ### Other planning inputs
 
@@ -274,6 +274,7 @@ The profile is a synthetic fixture; replace its history and recovery inputs befo
 
 - [Planning instructions](SKILL.md): goals, workout selection, output and feedback workflow.
 - [Periodization](references/goal-periodization.md) and [feedback loop](references/feedback-loop.md): phases, reassessment and post-ride changes.
+- [Power-profile workflow (Chinese)](references/power-profile-workflow.md): optional 6s–60m inputs, read-only historical MCP curves and performance-group P60 candidates, with research limits and the [threshold roadmap](references/power-curve-assessment-plan.md).
 
 ---
 

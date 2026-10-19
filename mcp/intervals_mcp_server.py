@@ -14,6 +14,8 @@ from src.planning import assess_plan, iso_date
 from src.state import TrainingStore, fingerprint
 from src.tier_calculator import RiderProfile, generate_workout
 from src.workout import Workout
+from src.power_profile import prepare_intake, assess_power_curves, summarize_steady_streams, history_coverage
+from src.intervals import ApiError
 
 mcp = FastMCP('intervals-icu')
 # FastMCP configures INFO logging; HTTP URLs contain private athlete IDs.
@@ -54,6 +56,64 @@ def get_recent_wellness_and_activities(oldest_date: str, newest_date: str) -> st
         raise ValueError('Date range reversed')
     query = '?' + urlencode(dict(oldest=oldest_date, newest=newest_date))
     return _json(dict(activities=_request('/activities' + query), wellness=_request('/wellness' + query)))
+
+
+@mcp.tool()
+def prepare_power_profile(cp20_watts: float | None = None, weight_kg: float | None = None,
+                          known_points: dict[str, float] | None = None, working_ftp_w: float | None = None,
+                          performance_group: str | None = None, group_basis: str | None = None,
+                          effort_status: str = 'unknown') -> str:
+    """Offline intake: ask optional 6/30/60/180/300/720/1200/2400/3600s powers.
+
+    known_points maps duration seconds to watts. Ask only missing durations; retain
+    dates, device and maximality separately. Study groups: recreational, trained,
+    well_trained, professional; group_basis: vo2max_report/self_report/wkg_heuristic.
+    Group coefficients predict P60, not measured FTP/LT2; never infer study group
+    automatically from FTP W/kg. This tool performs no network calls or writes.
+    """
+    return _json(prepare_intake(cp20_watts, weight_kg, known_points, working_ftp_w,
+                                performance_group, group_basis, effort_status))
+
+
+@mcp.tool()
+def get_power_curve_evidence(newest_date: str, windows_days: list[int] | None = None,
+                             primary_window: str = '90d', working_ftp_w: float | None = None,
+                             weight_kg: float | None = None, performance_group: str | None = None,
+                             group_basis: str | None = None, effort_status: str = 'unknown',
+                             working_ftp_note: str | None = None) -> str:
+    """Read authorized Intervals history (42/90/365d default) and assess power evidence.
+
+    newest_date is the athlete's local YYYY-MM-DD. Returns exact API bounds, 9
+    duration nodes and source dates, platform models, observational CP diagnostics,
+    group-based P60 candidates and missing-input questions. Maximality/device
+    quality remain unverified; no automatic FTP, LT1/LT2 or calendar mutation.
+    """
+    prepare_intake(weight_kg=weight_kg, working_ftp_w=working_ftp_w,
+                   performance_group=performance_group, group_basis=group_basis, effort_status=effort_status)
+    client = IntervalsClient(ATHLETE_ID, API_KEY)
+    data = client.power_curves(newest_date, windows_days)
+    report = assess_power_curves(data, newest_date, working_ftp_w, weight_kg,
+                                 primary_window, performance_group, group_basis, effort_status, working_ftp_note)
+    starts = [c['start'][:10] for c in report['curves'] if c.get('start')]
+    if starts:
+        try:
+            report['coverage'] = history_coverage(client.power_activity_metadata(min(starts), newest_date), report['curves'])
+        except (ApiError, ValueError):
+            report['coverage'] = dict(status='metadata_unavailable_curves_preserved')
+    return _json(report)
+
+
+@mcp.tool()
+def get_steady_ride_evidence(activity_id: str, start_seconds: int = 900,
+                            duration_seconds: int = 2400) -> str:
+    """Read an authorized activity's time/watts/HR/cadence, without GPS.
+
+    Summarize a selected continuous 1Hz window after warmup; reject gaps, nulls
+    and irregular sampling rather than interpolate. Decoupling is descriptive,
+    never an LT1 measurement or a pass/fail threshold. Ask RPE/fueling/heat context.
+    """
+    data = IntervalsClient(ATHLETE_ID, API_KEY).activity_streams(activity_id)
+    return _json(dict(activity_id=activity_id, **summarize_steady_streams(data, start_seconds, duration_seconds)))
 
 
 @mcp.tool()
@@ -158,14 +218,25 @@ def create_intervals_workout(target_date: str, name: str, description_code: str,
 def generate_and_push_pro_workout(target_date: str, weight_kg: float, cp60_or_cp20_watts: float,
                                   is_cp20: bool = True, cp1_watts: float = 0.0,
                                   weekly_hours: str = '5-10', leg_strength: str = 'none',
-                                  age_group: str = '<30', indoor: bool = True, model: str = 'lt2') -> str:
+                                  age_group: str = '<30', indoor: bool = True, model: str = 'lt2',
+                                  performance_group: str | None = None, group_basis: str | None = None,
+                                  accept_group_estimate: bool = False, cp20_is_maximal: bool = False) -> str:
     """Compatibility generator/writer. Use the plan preview tools for constraint-aware scheduling.
 
     Requires authorization to write. is_cp20=false uses supplied FTP/CP60 directly.
+    CP20-only returns intake before any network call unless a study group, basis
+    and explicit acceptance of its provisional P60 estimate have been supplied,
+    and the P20 has been declared maximal rather than ordinary training.
     """
+    if is_cp20 and (not performance_group or not accept_group_estimate or not cp20_is_maximal):
+        return _json(dict(status='needs_power_profile', account_writes=0,
+                          intake=prepare_intake(cp60_or_cp20_watts, weight_kg,
+                                                known_points={'60': cp1_watts} if cp1_watts else None,
+                                                performance_group=performance_group, group_basis=group_basis)))
     rider = RiderProfile(weight_kg=weight_kg, cp60_watts=None if is_cp20 else cp60_or_cp20_watts,
                          cp20_watts=cp60_or_cp20_watts if is_cp20 else None, cp1_watts=cp1_watts or None,
-                         weekly_hours=weekly_hours, leg_strength=leg_strength, age_group=age_group, indoor=indoor)
+                         weekly_hours=weekly_hours, leg_strength=leg_strength, age_group=age_group, indoor=indoor,
+                         performance_group=performance_group, group_basis=group_basis, cp20_is_maximal=cp20_is_maximal)
     analysis = rider.analyze()
     w = generate_workout(analysis, model)
     plan = dict(schema_version=1, plan_id='generated-workouts', ftp=analysis['effective_ftp_w'],

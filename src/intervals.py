@@ -20,21 +20,52 @@ class IntervalsClient:
         self.api_key, self.transport = api_key, transport
 
     def request(self, path, method='GET', payload=None):
-        import httpx
         if not path.startswith(('/', '?')) and path != '':
             raise ValueError('Only athlete-relative API paths are supported')
+        return self._request_url(self.base + path, method, payload)
+
+    def _request_url(self, url, method='GET', payload=None):
+        import httpx
         try:
             with httpx.Client(transport=self.transport, timeout=30,
                               auth=('API_KEY', self.api_key),
                               headers={'User-Agent': 'cyclingworkouts-mcp/1.0 (personal training planner)',
                                        'Accept': 'application/json'}) as client:
-                response = client.request(method, self.base + path, json=payload)
+                response = client.request(method, url, json=payload)
                 response.raise_for_status()
                 return response.json()
         except httpx.HTTPStatusError as exc:
             raise ApiError(f'Intervals HTTP {exc.response.status_code}; inspect permissions or retry after checking the calendar.') from None
         except (httpx.RequestError, ValueError):
             raise ApiError('Intervals request failed or returned invalid JSON; write outcome may be unknown.') from None
+
+    def power_curves(self, newest_date, windows_days=None):
+        """Read watts curves. Keep API-reported bounds: Nd may span N+1 calendar dates."""
+        newest_date = iso_date(newest_date).isoformat()
+        windows = [42, 90, 365] if windows_days is None else windows_days
+        if (not isinstance(windows, list) or not 1 <= len(windows) <= 6 or
+                any(type(d) is not int or not 1 <= d <= 3650 for d in windows) or
+                len(set(windows)) != len(windows)):
+            raise ValueError('Use 1-6 unique integer lookback windows, each 1-3650 days')
+        query = urlencode(dict(type='Ride', curves=','.join(f'{d}d' for d in windows),
+                               newest=newest_date, now=newest_date, includeRanks='false'))
+        return self.request('/power-curves?' + query)
+
+    def activity_streams(self, activity_id):
+        """Read only time/power/HR/cadence, without location streams or account writes."""
+        if not isinstance(activity_id, str) or not re.fullmatch(r'i?\d+', activity_id):
+            raise ValueError('Invalid activity ID')
+        base = self.base.split('/athlete/', 1)[0]
+        return self._request_url(base + '/activity/' + activity_id + '/streams?' +
+                                 urlencode(dict(types='time,watts,heartrate,cadence', includeDefaults='false')))
+
+    def power_activity_metadata(self, oldest_date, newest_date):
+        oldest_date, newest_date = iso_date(oldest_date), iso_date(newest_date)
+        if oldest_date > newest_date:
+            raise ValueError('Activity range reversed')
+        fields = 'id,type,start_date_local,moving_time,icu_average_watts,icu_weight,source,device_watts,icu_ignore_power'
+        return self.request('/activities?' + urlencode(dict(oldest=oldest_date.isoformat(),
+                            newest=newest_date.isoformat()+'T23:59:59', fields=fields, limit=1000)))
 
 
 def list_calendar(request, oldest, newest):

@@ -239,6 +239,17 @@ class McpToolBoundaryTests(unittest.TestCase):
         self.assertEqual(result['status'], 'verified')
         self.assertEqual(next(iter(self.api.events.values()))['moving_time'], 61)
 
+    def test_cp20_only_generator_returns_intake_before_any_account_call(self):
+        calls = []
+        def forbidden(*args, **kwargs):
+            calls.append(args)
+            raise AssertionError('No account call permitted before intake')
+        self.server._request = forbidden
+        r = json.loads(self.server.generate_and_push_pro_workout('2026-11-03', 70, 250))
+        self.assertEqual(r['status'], 'needs_power_profile')
+        self.assertEqual(calls, [])
+        self.assertEqual(self.api.writes, 0)
+
 
 if __name__ == '__main__':
     unittest.main()

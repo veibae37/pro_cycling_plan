@@ -49,19 +49,17 @@ The fixed CLI/MCP generation interface does not accept goal dates, race dates, c
 
 ## 3. Fixed rider analysis and scaling
 
+This section describes the compatibility calculator, not mandatory Agent planning policy. The Skill now prioritizes progressive questions, goal/history/recovery-based doses and transparent provisional P20-to-P60 estimates when detailed answers are unavailable. Agents may draft custom plans rather than select a W/kg tier or replicate a Pro template. Existing tool validation does not require withholding a clearly labeled provisional/RPE plan or inventing maximal-test evidence to satisfy a writer's inputs.
+
 ### FTP inputs and short-duration power
 
-`RiderProfile.analyze()` requires CP60/FTP or CP20. It prefers CP60 when both are supplied. For CP20-only input, it first calculates a preliminary FTP as `CP20 × 0.95`; the optional CP1 ratio uses this preliminary value.
+`RiderProfile.analyze()` prefers an explicitly supplied FTP/P60 working reference. CP20-only input now requires follow-up rather than silently multiplying by 0.95. The CLI returns an intake response; the compatibility generation MCP returns `needs_power_profile` without network calls until an explicit performance group, basis and acceptance are supplied.
 
-The current CP20 conversion branches are:
+Declared groups may use the [Sitko et al. 2023](https://pubmed.ncbi.nlm.nih.gov/37802084/) P60 prediction factors: recreational 0.88, trained 0.92, well-trained 0.95 and professional 0.96. The study grouped by VO2max, not FTP W/kg. Group basis is recorded as `vo2max_report`, `self_report` or explicitly weaker `wkg_heuristic`. These predict P60, not measured FTP/LT2. Group-model validation MAE is not an individual confidence interval.
 
-- CP1/preliminary FTP above 2.2: `effective FTP = CP20 × 0.92`.
-- Ratio below 1.85: `effective FTP = CP20 × 0.96`.
-- Otherwise, including missing CP1: `effective FTP = CP20 × 0.95`.
+The unsupported CP1-driven 0.92/0.96 conversion branches have been removed. CP1 ratios now use the selected working reference and remain template hints, not measurements of W′, VLamax or muscle fibers.
 
-Explicit CP60/FTP bypasses these conversion branches. The returned `cp1_to_ftp_ratio` is based on preliminary FTP, not recalculated from the final adjusted FTP.
-
-These factors and labels are legacy heuristics. Labels referring to a physiological phenotype or VLamax are not measurements or diagnoses. Prefer a valid FTP and consistent test protocol; a CP1 ratio cannot establish W′, VLamax or muscle-fiber composition.
+`scripts/power_profile.py` provides offline intake and an actual MCP stdio read-only trial. `prepare_power_profile`, `get_power_curve_evidence` and `get_steady_ride_evidence` expose optional inputs, 42/90/365d curves, observational CP diagnostics and descriptive steady-ride windows. See the [workflow](../references/power-profile-workflow.md) for commands, provenance, API bounds and limits. No threshold is automatically adopted; dedicated assessment persistence and migration remain planned.
 
 ### Tier and volume modifiers
 
@@ -183,16 +181,19 @@ Correct hard conflicts or explicitly revise their underlying constraints. Warnin
 
 Use Python 3.10+ and install [requirements.txt](../requirements.txt) in the interpreter configured by the host. The local stdio server uses MCP 1.x `FastMCP`, HTTPX, a 30-second timeout and an identifying User-Agent. Windows needs `tzdata` for IANA timezone validation. Set `INTERVALS_ATHLETE_ID` (default `0`, the API-key owner) and `INTERVALS_API_KEY`. Errors omit credentials, response bodies and private URLs; HTTPX URL logging is suppressed.
 
-Eleven tools are exposed:
+Fourteen tools are exposed:
 
 - `get_athlete_profile`: identity, weight and sport settings; FTP/eFTP/W-prime availability depends on the returned settings.
 - `get_recent_wellness_and_activities`: dated actual activity and wellness records.
+- `prepare_power_profile`: offline optional-input questions and declared-group P60 scenarios; no network calls.
+- `get_power_curve_evidence`: read-only 42/90/365d curves and minimal activity coverage, with source dates, provisional models and nonmaximal-effort handling.
+- `get_steady_ride_evidence`: non-GPS stream read and descriptive continuous-window metrics; never an LT1 measurement.
 - `get_calendar_events`: dated planned events, parsed steps and resolved power.
 - `preview_training_plan(plan, profile)`: read-only feasibility/calendar comparison and `preview_hash`.
 - `sync_training_plan(plan, profile, expected_preview_hash, review_note="")`: authorized upsert followed by verification. Warnings require a reason; hard conflicts block writes.
 - `save_athlete_profile`, `save_training_plan`, `read_training_state`, `record_training_feedback`: private records described below.
 - `create_intervals_workout`: compatibility single-session writer. Now requires explicit `ftp_watts`, derives exact seconds and rejects mismatched `moving_time_sec`.
-- `generate_and_push_pro_workout`: compatibility fixed-template generator/writer. Defaults to CP20; use `is_cp20=false` for FTP/CP60.
+- `generate_and_push_pro_workout`: compatibility fixed-template generator/writer. Defaults to CP20 intake; use `is_cp20=false` for a supplied FTP/P60 reference. P20-based generation requires a declared maximal effort, group/basis and explicit acceptance of the provisional estimate.
 
 The two compatibility writers use the reliable sync core but do not perform full plan feasibility checks. Prefer the plan preview/sync tools for multiweek work.
 

@@ -281,3 +281,5 @@ The profile is a synthetic fixture; replace its history and recovery inputs befo
 [简体中文](README.md) · **English**
 
 For the planning workflow, calculation methods, MCP tools and implementation limits, read [Implementation Details](docs/IMPLEMENTATION.md).
+
+Licensed under the [Apache License 2.0](LICENSE).

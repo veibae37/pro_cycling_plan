@@ -278,3 +278,5 @@ python -X utf8 scripts/training_plan.py export --plan examples/portable-plan.jso
 **简体中文** · [English](README.en.md)
 
 了解排课流程、计算公式、MCP工具和实现边界：[Implementation Details（英文）](docs/IMPLEMENTATION.md)。
+
+本项目采用 [Apache License 2.0](LICENSE)。
